@@ -1,11 +1,18 @@
-const axios = require('axios')
-import generateUUID from './util/uuid'
-const WebSocket = require('isomorphic-ws')
+import axios from 'axios'
+import {generateUUID} from './util/uuid'
+import WebSocket from 'isomorphic-ws'
 
-const Loader = require('@dwmt/loader/lib/Loader')
+import { Loader }  from '@dwmt/loader'
 
-function getLoader (channel, options) {
-  let loader = new Loader()
+type TChannel = {
+  loader: Loader
+}
+type TOptions = {
+  loader?: Loader | boolean
+}
+
+function getLoader (channel: TChannel, options: TOptions) {
+  let loader: Loader = new Loader()
   if (typeof options.loader === 'boolean' && !options.loader) {
     return loader
   }
@@ -14,7 +21,7 @@ function getLoader (channel, options) {
     loader = channel.loader
   }
 
-  if(typeof options.loader === 'object' && options.loader.work && options.loader.terminate) {
+  if(options.loader instanceof Loader) {
     loader = options.loader
   }
 
@@ -149,10 +156,8 @@ function wsStrategy (options) {
   return channel
 }
 
-export default class Client {
+export class Client {
   constructor (options = {}) {
-    this._axios = axios
-    this._ws = WebSocket
     this._dialects = {}
     this._channels = {}
     this._headers = {}
@@ -424,7 +429,7 @@ export default class Client {
     throw new Error('Not implemented yet!')
   }
 
-  async _rpc (type = 'request', path, data, options, _dialect) {
+  async _rpc (path, data, options, _dialect) {
     const channel = this._channels[options.channel || this._deafultRPCChannel]
     const dialect = this._dialects[_dialect || this._defaultDialect]
     const rpcConfig = channel.rpc
@@ -438,13 +443,12 @@ export default class Client {
 
     const ID = idGenerator()
 
-    let message = {
+    let message: any = {
       id: ID
     }
     const sendMeta = typeof dialect.sendMeta === 'undefined' ? true : dialect.sendMeta
     if (sendMeta) {
       message['_dialect'] = dialect.name
-      message['_type'] = type
     }
 
     const router = dialect.router(path)
@@ -471,16 +475,13 @@ export default class Client {
   }
 
 
-  async _rpcHTTP (type = 'request', path, data, options, _dialect) {
+  async _rpcHTTP (path, data, options, _dialect) {
     const channel = this._channels[options.channel || this._deafultRPCChannel]
     const dialect = this._dialects[_dialect || this._defaultDialect]
     const rpcConfig = channel.rpc
 
     if (!dialect.type || dialect.type !== 'http') {
       throw new Error('ComlinkDialect is not supported on HTTPChannel yet!')
-    }
-    if (dialect.type === 'http' && type !== 'request') {
-      throw new Error('HTTPDialect only supports request now!')
     }
 
     if (!rpcConfig.dialects.includes(dialect.name)) {
@@ -495,7 +496,7 @@ export default class Client {
       throw new Error(err.response.data.message)
     }
   }
-  async _rpcMethod (type = 'request', path, data, options, _dialect) {
+  async _rpcMethod (path, data, options, _dialect) {
     const channel = this._channels[options.channel || this._deafultRPCChannel]
     const dialect = this._dialects[_dialect || this._defaultDialect]
     const rpcConfig = channel.rpc
@@ -505,7 +506,8 @@ export default class Client {
     }
     return dialect.handler(path, data, options)
   }
-  async request (path, data, options = {}, _dialect) {
+
+  async request<T = any> (path: any, data: any, options = {}, _dialect?: string): Promise<T> {
     const channelName = options.channel || this._deafultRPCChannel
     const channel = this._channels[channelName]
     const dialect = this._dialects[_dialect || this._defaultDialect]
@@ -515,12 +517,12 @@ export default class Client {
     const loaderID = loader.work()
     try {
       if(dialect.type === 'method') {
-        return await this._rpcMethod('request', path, data, options, _dialect)
+        return await this._rpcMethod(path, data, options, _dialect)
       } 
       if (channel.type === 'http') {
-        return await this._rpcHTTP('request', path, data, options, _dialect)
+        return await this._rpcHTTP(path, data, options, _dialect)
       } else {
-        return await this._rpc('request', path, data, options, _dialect)
+        return await this._rpc(path, data, options, _dialect)
       }
     } catch (err) {
       await errorHandler(err, options)
@@ -530,26 +532,4 @@ export default class Client {
     }
   }
 
-  async inform (path, data, options = {}, _dialect) {
-    const channelName = options.channel || this._deafultRPCChannel
-    const channel = this._channels[channelName]
-    const loader = getLoader(channel, options)
-    const errorHandler = options.onError || channel.onError
-
-    const loaderID = loader.work()
-    try {
-      if (channel.type === 'http') {
-        return await this._rpc('inform', path, data, options, _dialect)
-      } else if(channel.type === 'method') {
-        return await this._rpcMethod('inform', path, data, options, _dialect)
-      }  else {
-        return await this._rpc('inform', path, data, options, _dialect)
-      }
-    } catch (err) {
-      await errorHandler(err)
-      throw err
-    } finally {
-      loader.terminate(loaderID)
-    }
-  }
 }

@@ -1,6 +1,6 @@
-const CL = require('@dwmt/comlink')
+import {Client} from '../src/Comlink'
 
-const api = new CL.CLient({})
+const api = new Client({})
 
 api.registerDialect({
   name: 'CM',
@@ -57,14 +57,14 @@ api.registerDialect({
   }
 })
 
-api.registerChannel({
-  type: 'http',
+const rest = new Channel<HTTPChannel>({
+  name: 'rest',
   ssl: true,
   uri: 'localhost:7777/api',
-  default: true,
   rpc: false,
-  name: 'rest'
 })
+
+api.registerChannel(rest, { default: true })
 
 api.registerHeader({
   name: 'jwtToken',
@@ -97,8 +97,38 @@ api.registerChannel({
 
 api.channel('socket').connect()
 
-api.request(route, data, options, _dialect)
 
-api.request('User.login', { email, password }, { division: 'Harconer', loader: ButtonLoader, errorHandler: false })
 
-api.request('Finance.getTransactions', [{}], { channel: 'socket' }, 'plugin')
+
+
+
+
+
+
+
+
+
+
+
+async function start () {
+  type TPhone = {
+    dialCode: string;
+    number: string;
+  }
+  
+  interface IUser {
+    name: string;
+    email: string;
+    phone: TPhone
+  }
+  
+  
+  const example: any = api.request('Service.method', ['a', 123, 'b'], {}, 'service')
+  
+  console.log(example.kek)
+  
+  const user: IUser = await api.request<IUser>('User.getUser', ['thisIsAUserID'], {}, 'service')
+  
+  console.log(user.phone.dialCode)
+}
+

@@ -1,18 +1,32 @@
-import generateUUID from './util/uuid'
-const {EventEmitter} = require('events')
+import { generateUUID } from './util/uuid'
+import { EventEmitter } from 'events'
+import {ILogger} from './util/logger'
 
-export default class Server {
-  constructor (logger) {
-    this._dialects = {}
+interface IDialect {
+  name: string;
+  interface: Record<string, any>;
+  onRequest(msg: any): Promise<any>
+}
+
+interface IChannel {}
+
+interface ISession {}
+
+export class Server {
+  eventEmitter: EventEmitter
+  logger: ILogger
+  _dialects: Map<string, IDialect>
+  constructor (logger?: ILogger) {
+    this._dialects = new Map<string, IDialect>()
     this._channels = {}
     this._clients = {}
     this.session = {}
     this.eventEmitter = new EventEmitter()
-    this.logger = logger || console
+    this.logger = logger ?? console
   }
 
-  registerDialect (_dialect) {
-    this._dialects[_dialect.name] = _dialect
+  registerDialect (_dialect: IDialect) {
+    this._dialects.set(_dialect.name, _dialect)
   }
 
   registerChannel (_channel) {
